@@ -1,0 +1,5 @@
+name = Facebook Automatic Post
+description = Posts an update to Facebook on node creation
+core = 7.x
+dependencies[] = "fboauth"
+files[] = facebook_post.module

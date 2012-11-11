@@ -1,0 +1,68 @@
+<?php
+
+function facebook_post_menu() {
+  $items["admin/config/content/facebook_post"] = array(
+    'title' => 'Post to Facebook',
+    'description' => 'Post to Facebook administration.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('facebook_post_admin_form'),
+    'access callback' => 'user_access',
+    'access arguments' => array('administer site configuration'),
+  );
+  return $items;
+}
+
+function facebook_post_admin_form($form, &$form_state) {
+   $form['facebook_post_message'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Message'),
+    '#default_value' => variable_get('facebook_post_message', 'I just posted [node:title]. Check it out at [node:url]'),
+    '#description' => t('The message you want to display on Facebook.'),
+    '#required' => TRUE
+  );
+
+  return system_settings_form($form);
+}
+
+  
+function facebook_post_initiate() {
+  $fb_link_array = fboauth_action_link_properties('facebook_auto_post');
+  $full_fb_url = url($fb_link_array['href'], array('absolute' => TRUE, 'query' => $fb_link_array['query']));
+  drupal_goto($full_fb_url); 
+}
+
+function facebook_post_fboauth_actions() {
+  $actions['facebook_auto_post'] = array(
+    'title' => t('Post to Facebook'),
+    'callback' => 'facebook_post_fboauth_action_post_update',
+    'permissions' => array(
+      'publish_stream', 
+    )
+  );
+  return $actions;
+}
+
+function facebook_post_fboauth_action_post_update($app_id, $access_token) {
+  $params = array();
+  $node = node_load($_SESSION['nid']);
+  $message = variable_get('facebook_post_message', 'I just posted [node:title]. Check it out at [node:url]');
+  $params['message'] = str_replace('[node:title]', $node->title, $message);
+  $params['message'] = str_replace('[node:url]', url('node/'.$node->nid, array('absolute' => TRUE)),  $params['message']);
+  $result = fboauth_graph_query('me/feed',$access_token, $params, 'POST');
+  return url('invite', array('absolute' => TRUE))."?nid=".$node->nid;
+}
+
+function facebook_post_form_alter(&$form, $form_state, $form_id) {
+  if ($form_id == 'node_type_form') {
+    $form['workflow']['node_options']['#options']['facebook_post'] = t('Publish to Facebook');
+  }
+
+}
+
+function facebook_post_node_insert  ($node) {
+  $node_options = variable_get('node_options_' . $node->type, array('facebook_post'));
+  if(in_array('facebook_post', $node_options)) {
+    $_SESSION['nid'] = $node->nid;
+    facebook_post_initiate();
+  }
+}
